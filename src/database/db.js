@@ -53,9 +53,9 @@ class DatabaseConnection {
         throw new Error("MongoDB URI is not defined in environment variables");
       }
 
-      const connectionOptions = {
-        useNewUrlParser: true, // Uses modern MongoDB connection string parser
-        useUnifiedTopology: true, // Uses new MongoDB engine
+      const connectionOptions = { // this two needed for olderversion of mongoose below 5or6
+        // useNewUrlParser: true, // Uses modern MongoDB connection string parser
+        // useUnifiedTopology: true, // Uses new MongoDB engine
         maxPoolSize: 10, // Maximum simultaneous DB connections
         serverSelectionTimeoutMS: 5000, // Timeout if DB server not found
         socketTimeoutMS: 45000, // Close inactive connections

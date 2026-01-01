@@ -7,7 +7,7 @@ import cookieParser from "cookie-parser";
 import { rateLimit } from "express-rate-limit";
 import helmet from "helmet";
 import connectDB from "./database/db.js";
-
+import hpp from "hpp";
 // Load environment variables
 dotenv.config({
   path: "./.env",
@@ -65,7 +65,9 @@ app.use(cookieParser()); // parses cookies sent by the client.
 // CORS Configuration
 app.use(
   cors({
-    origin: process.env.CLIENT_URL.split(",") || "http://localhost:5173", // split if array is given
+    origin: process.env.CLIENT_URL
+  ? process.env.CLIENT_URL.split(",")
+  : ["http://localhost:5173"], // split if array is given
     credentials: true,
     methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "HEAD", "OPTIONS"],
     allowedHeaders: [
