@@ -1,0 +1,25 @@
+{
+  "name": "lms",
+  "version": "1.0.0",
+  "description": "This learning management system.",
+  "main": "src/index.js",
+  "type":"module",
+  "scripts": {
+    "dev": "nodemon src/index.js",
+    "start": "node src/index.js"
+  },
+  "keywords": [
+    "lms"
+  ],
+  "author": "shahji",
+  "license": "ISC",
+  "dependencies": {
+    "bcryptjs": "^3.0.3",
+    "dotenv": "^17.2.3",
+    "express": "^5.2.1",
+    "mongoose": "^9.1.1"
+  },
+  "devDependencies": {
+    "prettier": "^3.7.4"
+  }
+}
