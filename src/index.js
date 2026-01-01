@@ -6,9 +6,15 @@ import cors from "cors";
 import cookieParser from "cookie-parser";
 import { rateLimit } from "express-rate-limit";
 import helmet from "helmet";
+import connectDB from "./database/db.js";
+
+// Load environment variables
 dotenv.config({
   path: "./.env",
 });
+
+// Connect to database
+await connectDB();
 
 const app = express();
 const port = process.env.PORT || 8000;
