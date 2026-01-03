@@ -2,12 +2,13 @@ import Mailgen from "mailgen";
 import nodemailer from "nodemailer";
 
 const sendMail = async (options) => {
+  // Configure mailgen by setting a theme and your product info
   const mailGenerator = new Mailgen({
     theme: "default",
     product: {
       // Appears in header & footer of e-mails
-      name: "LMS",
-      link: "https://LMS.com/",
+      name: "MainProject",
+      link: "MainProject.com",
       // Optional product logo
       // logo: 'https://mailgen.js/img/logo.png'
     },
@@ -30,28 +31,28 @@ const sendMail = async (options) => {
       pass: process.env.SMTP_PASS,
     },
   });
-  const options = {
-    from: '"Learning management system" <lms.email>',
-    to: options.user,
+  const option = {
+    from: '"MainProject" <mainproject.email>"',
+    to: options.email,
     subject: options.subject,
-    text: emailText, // Plain-text version of the message
-    html: emailBody, // HTML version of the message
+    text: emailText,
+    html: emailBody,
   };
-
-  await transporter.sendMail(options);
-  console.log("mail has been sent!");
+  await transporter.sendMail(option);
+  console.log("Mail has been sent");
 };
-function emailVerificationMailContent(username, verificationUrl) {
+
+function emailVerificationMailgenContent(username, verifictionUrl) {
   return {
     body: {
       name: username,
-      intro: "Welcome to LMS,We're very excited to have you on board.",
+      intro: "Welcome to MainProject We're very excited to have you on board.",
       action: {
-        instructions: "To get started with LMS, please click here:",
+        instructions: "To get started with MainProject, please click here:",
         button: {
           color: "#22BC66", // Optional action button color
           text: "Verify",
-          link: verificationUrl,
+          link: verifictionUrl,
         },
       },
       outro:
@@ -60,25 +61,27 @@ function emailVerificationMailContent(username, verificationUrl) {
   };
 }
 
-function forgotPassowrdMailContent(username, forgotPasswordUrl) {
+function forgotPasswordMailgenContent(username, forgotPasswordUrl) {
   return {
     body: {
       name: username,
-      intro: "You recently requested to reset your password for your account.",
+      intro: "This Mail is from MainProject to reset your Password",
       action: {
-        instructions: "Click the button below to reset your password:",
+        instructions: "To reset your password, please click here:",
         button: {
-          color: "#DC4D2F", // Red/orange is common for security actions
-          text: "Reset your password",
+          color: "#22BC66", // Optional action button color
+          text: "Reset",
           link: forgotPasswordUrl,
         },
       },
-      outro: [
-        "This password reset link will expire in 10 minutes.",
-        "If you did not request a password reset, please ignore this email or contact support if you have concerns.",
-      ],
+      outro:
+        "Need help, or have questions? Just reply to this email, we'd love to help.",
     },
   };
 }
 
-export { emailVerificationMailContent, forgotPassowrdMailContent, sendMail };
+export {
+  emailVerificationMailgenContent,
+  forgotPasswordMailgenContent,
+  sendMail,
+};

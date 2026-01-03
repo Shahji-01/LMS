@@ -80,16 +80,15 @@ const userSchema = new mongoose.Schema(
     timestamps: true,
     toJSON: { virtuals: true }, // this two has to set when we use virtuals
     toObject: { virtuals: true },
-  }
+  },
 );
 
 // Hashed the password before saving
-userSchema.pre("save", async function (next) {
+userSchema.pre("save", async function () {
   if (!this.isModified("password")) {
-    return next();
+    return;
   }
   this.password = await bcrypt.hash(this.password, 12);
-  next();
 });
 
 // From // here we are adding the method to methods in moongoose which user model can access
@@ -125,7 +124,7 @@ userSchema.methods.getemailVerificationToken = function () {
 userSchema.methods.updateLastActive = function () {
   this.lastActive = Date.now();
   return this.save({ validateBeforeSave: false });
-}; 
+};
 
 // Virtual field for total enrolled courses
 userSchema.virtual("totalEnrolledCourses").get(function () {
@@ -133,5 +132,3 @@ userSchema.virtual("totalEnrolledCourses").get(function () {
 });
 
 export const User = mongoose.model("User", userSchema);
-
-export { User };

@@ -8,6 +8,13 @@ import { rateLimit } from "express-rate-limit";
 import helmet from "helmet";
 import connectDB from "./database/db.js";
 import hpp from "hpp";
+import { mediaRoute } from "./routes/media.route.js";
+import { userRoute } from "./routes/user.route.js";
+import { courseRoute } from "./routes/course.route.js";
+import { purchaseRoute } from "./routes/purchaseCourse.route.js";
+import { healthRoute } from "./routes/health.route.js";
+import { courseProgressRoute } from "./routes/courseProgress.route.js";
+import { razorpayRoute } from "./routes/razorpay.route.js";
 // Load environment variables
 dotenv.config({
   path: "./.env",
@@ -82,7 +89,14 @@ app.use(
   }),
 );
 
-// Api Routes
+// API Routes
+app.use("/api/v1/media", mediaRoute);
+app.use("/api/v1/user", userRoute);
+app.use("/api/v1/course", courseRoute);
+app.use("/api/v1/purchase", purchaseRoute);
+app.use("/api/v1/progress", courseProgressRoute);
+app.use("/api/v1/razorpay", razorpayRoute);
+app.use("/health", healthRoute);
 
 // 404 Handler
 app.use((req, res) => {
