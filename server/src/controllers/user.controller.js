@@ -20,35 +20,38 @@ export const createUserAccount = catchAsync(async (req, res) => {
   // TODO: Implement create user account functionality
   const { name, email, password } = req.body;
 
-  const user = await User.findOne({ email: email.toLowerCase() });
-  if (user) {
+  // Check if user already exists
+  const existingUser = await User.findOne({ email: email.toLowerCase() });
+  if (existingUser) {
     throw new AppError(409, "User already exists,so signin");
   }
-  const newUser = await User.create({
+
+  // Create user (password hashing is handled by the model)
+  const user = await User.create({
     name,
     email: email.toLowerCase(),
     password,
   });
 
-  await newUser.updateLastActive();
-  const createdUser = await User.findById(newUser._id);
-  if (!createdUser) {
+  if (!user) {
     throw new AppError(500, "Fail to signup a user");
   }
-  const unHashToken = createdUser.getemailVerificationToken();
+  // Update last active and generate unHashtoken for email verification
+  await user.updateLastActive(); // This only modifies the document in memory.
+  const unHashToken = user.getemailVerificationToken();
 
-  await createdUser.save({ validateBeforeSave: false });
+  await user.save({ validateBeforeSave: false }); //Nothing is written to the database until you call .save().
 
   await sendMail({
     email,
     subject: "Verifiction Mail",
     MailgenContent: emailVerificationMailgenContent(
-      createdUser.username,
-      `${req.protocol}://${req.get("host")}/verify-email/${unHashToken}`
+      user.username,
+      `${req.protocol}://${req.get("host")}/verify-email/${unHashToken}`,
     ),
   });
   return res.json(
-    new AppResponse(200, "User is created or Signup successfully", createdUser)
+    new AppResponse(200, "User is created or Signup successfully", user),
   );
 });
 
@@ -59,17 +62,19 @@ export const createUserAccount = catchAsync(async (req, res) => {
 export const authenticateUser = catchAsync(async (req, res) => {
   // TODO: Implement user authentication functionality
   const { email, password } = req.body;
-  const user = await User.findOne({ email }); // if password select is false then we can user .select("+password")
+  // Find user and check password
+  const user = await User.findOne({ email }).select("+password"); // if password select is false then we can user .select("+password")
 
   if (!user || !(await user.comparePassword(password))) {
     throw new AppError(401, "invalid email or password");
   }
 
   await user.updateLastActive();
+  await user.save();
   await generateToken(
     res,
     user,
-    "Verifiction token has been created and assigned"
+    "Verifiction token has been created and assigned",
   );
 });
 
@@ -79,26 +84,9 @@ export const authenticateUser = catchAsync(async (req, res) => {
  */
 export const signOutUser = catchAsync(async (req, res) => {
   // TODO: Implement sign out functionality
-  const token = req.cookies.token || req.headers("token");
-  console.log(token);
-  if (!token) {
-    throw new AppError(
-      401,
-      "Unauthorized as there is no token in cookie or is invalid"
-    );
-  }
-  const user = await User.findOne({
-    refreshToken: token,
-    refreshExpire: { $gt: Date.now() },
-  });
-  if (!user) {
-    throw new AppError(401, "Unauthorized as token is invalid");
-  }
-  user.refreshToken = "";
-  user.refreshExpire = "";
-  await user.save({ validateBeforeSave: false });
   return res
-    .clearCookie("token", { httpOnly: true })
+    .cookie("token", "", { maxAge: 0 }, { httpOnly: true })
+    .status(200)
     .json(new AppResponse(200, "Signout successfully"));
 });
 
@@ -112,10 +100,16 @@ export const getCurrentUserProfile = catchAsync(async (req, res) => {
   // return res.json(new AppResponse(200, "User Details", req.user));
 
   // for all user info with course detail
-  const user = User.findById(req.id).populate({
-    path: "enrolledCourses.course",
-    select: "titile thumbnail description",
-  });
+  const user = User.findById(req.id)
+    .populate({
+      path: "enrolledCourses.course",
+      select: "titile thumbnail description",
+    })
+    .populate({
+      path: "createdCourses",
+      select: "title thumbnail enrolledStudents",
+    });
+
   if (!user) {
     throw new AppError(404, "User not found");
   }
@@ -158,7 +152,7 @@ export const updateUserProfile = catchAsync(async (req, res) => {
     {
       new: true,
       runValidators: true,
-    }
+    },
   );
   if (!updateUser) {
     throw new AppError(500, "Failed to update the user profile");
@@ -174,10 +168,15 @@ export const changeUserPassword = catchAsync(async (req, res) => {
   // TODO: Implement change user password functionality
   const { currentPassword, newPassword } = req.body;
 
-  const user = await User.findById(req.id);
+  // Get user with password
+  const user = await User.findById(req.id).select("+password");
+  if (!user) {
+    throw new AppError("User not found or password ", 404);
+  }
+  // Verify current password
   const isPasswordCorrect = await user.comparePassword(currentPassword);
   if (!isPasswordCorrect) {
-    throw new AppError(401, "Invalid Password");
+    throw new AppError(401, "Current password is incorrect");
   }
   user.password = newPassword;
   await user.save({ validateBeforeSave: false });
@@ -192,10 +191,11 @@ export const forgotPassword = catchAsync(async (req, res) => {
   // TODO: Implement forgot password functionality
   const { email } = req.body;
 
-  const user = await User.findOne({ email });
+  const user = await User.findOne({ email: email.toLowerCase() });
   if (!user) {
     throw new AppError(400, "User does't exits");
   }
+  // Generate reset token
   const resetToken = user.getResetPasswordToken();
   await user.save({ validateBeforeSave: false });
   const options = {
@@ -203,12 +203,13 @@ export const forgotPassword = catchAsync(async (req, res) => {
     subject: "Reset Password",
     MailgenContent: forgotPasswordMailgenContent(
       user.username,
-      `${req.protocol}://${req.get("host")}/reset-password/${resetToken}`
+      `${req.protocol}://${req.get("host")}/reset-password/${resetToken}`,
     ),
   };
+  // Send reset token via email in options
   await sendMail(options);
   return res.json(
-    new AppResponse(200, "Mail has been sent to reset the password")
+    new AppResponse(200, "Mail has been sent to reset the password"),
   );
 });
 
@@ -221,6 +222,7 @@ export const resetPassword = catchAsync(async (req, res) => {
   const { token } = req.params;
   const { newPassword } = req.body;
 
+  // Get user by reset token
   if (!token) {
     throw new AppError(400, "token is missing in the params");
   }
@@ -246,9 +248,19 @@ export const resetPassword = catchAsync(async (req, res) => {
  */
 export const deleteUserAccount = catchAsync(async (req, res) => {
   // TODO: Implement delete user account functionality
-  const user = await User.findByIdAndDelete(req.id);
-  if (!user) {
-    throw new AppError(500, "fail to delete the user or does't exist");
+  const user = await User.findById(req.id);
+
+  // Delete avatar if not default
+  if (user.avatar && user.avatar !== "default-avatar.png") {
+    await deleteMediaFromCloudinary(user.avatar);
   }
-  return res.json(new AppResponse(200, "user is delete successfully"));
+
+  // Delete user
+  await User.findByIdAndDelete(req.id);
+
+  res.cookie("token", "", { maxAge: 0 });
+  res.status(200).json({
+    success: true,
+    message: "Account deleted successfully",
+  });
 });
