@@ -1,36 +1,24 @@
 import React from "react";
 import { Link } from "react-router-dom";
+import { Home, Frown } from "lucide-react";
 
-const NotFoundPage = () => {
-  return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
-      <div className="max-w-md text-center bg-white border border-gray-200 rounded-2xl shadow-sm p-8">
-
-        {/* Title */}
-        <h2 className="text-5xl font-bold text-black mb-4">
-          404
-        </h2>
-
-        {/* Message */}
-        <p className="text-lg font-medium mb-2">
-          Page not found
-        </p>
-        <p className="text-sm text-gray-600 mb-6">
-          The page you are looking for doesn’t exist or has been moved.
-        </p>
-
-        {/* Action */}
-        <Link
-          to="/"
-          className="inline-block px-6 py-2.5 rounded-xl bg-black text-white font-medium
-                     hover:bg-black/90 transition"
-        >
-          Go back home
-        </Link>
-
+const NotFoundPage = () => (
+  <div className="min-h-[80vh] flex flex-col items-center justify-center px-6 text-center">
+    <div className="space-y-6 max-w-md fade-in-up">
+      <div className="text-8xl font-black gradient-text">404</div>
+      <div className="w-16 h-16 rounded-2xl bg-indigo-50 flex items-center justify-center mx-auto">
+        <Frown className="w-8 h-8 text-indigo-400" />
       </div>
+      <div>
+        <h1 className="text-2xl font-bold text-gray-900 mb-2">Page not found</h1>
+        <p className="text-gray-500">The page you're looking for doesn't exist or has been moved.</p>
+      </div>
+      <Link to="/" className="btn-primary inline-flex">
+        <Home className="w-4 h-4" />
+        Back to Home
+      </Link>
     </div>
-  );
-};
+  </div>
+);
 
 export default NotFoundPage;

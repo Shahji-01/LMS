@@ -1,55 +1,51 @@
 import mongoose from "mongoose";
-import { getDBStatus } from "../database/db.js";
-import { AppError } from "../middleware/error.middleware.js";
-export const checkHealth = async (req, res) => {
-  // TODO: Implement health check functionality
+import { catchAsync } from "../middleware/error.middleware.js";
+import { isRedisConnected, getRedisClient } from "../config/redis.js";
+
+/**
+ * @swagger
+ * /health:
+ *   get:
+ *     tags: [Health]
+ *     summary: Health check — DB, Redis, uptime
+ *     responses:
+ *       200:
+ *         description: System health status
+ */
+export const healthCheck = catchAsync(async (req, res) => {
+  // Check MongoDB
+  let dbStatus = "disconnected";
   try {
-    const dbStatus = getDBStatus();
-
-    const healthStatus = {
-      status: "OK",
-      timeStamp: new Date().toISOString(),
-      services: {
-        database: {
-          status: dbStatus.isConnected ? "healthy" : "unhealthy",
-          details: {
-            ...dbStatus,
-            readyState: getReadyStateText(dbStatus.readyState),
-          },
-        },
-        server: {
-          status: "healthy",
-          uptime: process.uptime(),
-          memoryUsage: process.memoryUsage(),
-        },
-      },
-    };
-    const httpStatus =
-      healthStatus.services.database.status === "healthy" ? 200 : 503;
-    res.status(httpStatus).json(healthStatus);
-  } catch (error) {
-    console.error("Health check falied", error);
-    res.status(500).json({
-      status: "ERROR",
-      timeStamp: new Date().toISOString(),
-      error: error.message,
-    });
+    if (mongoose.connection.readyState === 1) {
+      await mongoose.connection.db.command({ ping: 1 });
+      dbStatus = "connected";
+    }
+  } catch {
+    dbStatus = "error";
   }
-};
 
-function getReadyStateText(state) {
-  // TODO: Implement get ready state text functionality
-  switch (state) {
-    case 0:
-      return "disconnected";
-    case 1:
-      return "connected";
-    case 2:
-      return "connecting";
-    case 3:
-      return "disconnecting";
-
-    default:
-      return "unknown";
+  // Check Redis
+  let redisStatus = "disconnected";
+  if (isRedisConnected()) {
+    try {
+      await getRedisClient().ping();
+      redisStatus = "connected";
+    } catch {
+      redisStatus = "error";
+    }
   }
-}
+
+  const isHealthy = dbStatus === "connected";
+
+  return res.status(isHealthy ? 200 : 503).json({
+    success: isHealthy,
+    status: isHealthy ? "ok" : "degraded",
+    uptime: process.uptime(),
+    timestamp: new Date().toISOString(),
+    services: {
+      database: dbStatus,
+      redis: redisStatus,
+    },
+    version: process.env.npm_package_version || "1.0.0",
+  });
+});

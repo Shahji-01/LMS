@@ -1,5 +1,6 @@
 import Mailgen from "mailgen";
 import nodemailer from "nodemailer";
+import logger from "./logger.js";
 
 const sendMail = async (options) => {
   // Configure mailgen by setting a theme and your product info
@@ -39,24 +40,23 @@ const sendMail = async (options) => {
     html: emailBody,
   };
   await transporter.sendMail(option);
-  console.log("Mail has been sent");
+  logger.info({ to: options.email, subject: options.subject }, "Mail has been sent");
 };
 
-function emailVerificationMailgenContent(username, verifictionUrl) {
+function emailVerificationMailgenContent(username, otp) {
   return {
     body: {
       name: username,
-      intro: "Welcome to MainProject We're very excited to have you on board.",
+      intro: "Welcome to LearnHub! We're very excited to have you on board.",
       action: {
-        instructions: "To get started with MainProject, please click here:",
+        instructions: `Your email verification code is returning. It will expire in 10 minutes. Please enter the following OTP on the verification page: <strong>${otp}</strong>`,
         button: {
-          color: "#22BC66", // Optional action button color
-          text: "Verify",
-          link: verifictionUrl,
+          color: "#22BC66",
+          text: otp,
+          link: "#", // No link needed for OTP
         },
       },
-      outro:
-        "Need help, or have questions? Just reply to this email, we'd love to help.",
+      outro: "If you did not request this verification, please ignore this email.",
     },
   };
 }

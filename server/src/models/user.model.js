@@ -45,14 +45,8 @@ const userSchema = new mongoose.Schema(
     },
     enrolledCourses: [
       {
-        course: {
-          type: mongoose.Schema.Types.ObjectId,
-          ref: "Course",
-        },
-        enrolledAt: {
-          type: Date,
-          default: Date.now,
-        },
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Course",
       },
     ],
     createdCourses: [
@@ -75,6 +69,8 @@ const userSchema = new mongoose.Schema(
     },
     refreshToken: String,
     refreshExpire: Date,
+    isDeleted: { type: Boolean, default: false, index: true },
+    deletedAt: { type: Date, default: null },
   },
   {
     timestamps: true,
@@ -82,6 +78,13 @@ const userSchema = new mongoose.Schema(
     toObject: { virtuals: true },
   },
 );
+
+// Automatically exclude soft-deleted users from all find queries
+userSchema.pre(/^find/, function () {
+  if (!this.getOptions()._includeSoftDeleted) {
+    this.where({ isDeleted: { $ne: true } });
+  }
+});
 
 // Hashed the password before saving
 userSchema.pre("save", async function () {
@@ -109,15 +112,15 @@ userSchema.methods.getResetPasswordToken = function () {
   return resetToken;
 };
 
-// Generate email verification token
+// Generate email verification OTP
 userSchema.methods.getemailVerificationToken = function () {
-  const unHashToken = crypto.randomBytes(20).toString("hex");
+  const otp = crypto.randomInt(100000, 999999).toString();
   this.emailVerificationToken = crypto
     .createHash("sha256")
-    .update(unHashToken)
+    .update(otp)
     .digest("hex");
   this.emailVerificationExpire = Date.now() + 10 * 60 * 1000; // 10 minutes
-  return unHashToken;
+  return otp;
 };
 
 // Update lastActive timestamp

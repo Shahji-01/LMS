@@ -1,10 +1,17 @@
-import React, { useState } from "react";
-import axios from "axios";
-import { useNavigate } from "react-router-dom";
+import React, { useState, useRef, useEffect } from "react";
+import { useNavigate, Link } from "react-router-dom";
+import { createCourse } from "../api/services/courseService.js";
+import { getCategories } from "../api/services/categoryService.js";
+import toast from "react-hot-toast";
+import { ImagePlus, X, IndianRupee, Info, ArrowLeft, Loader2, GripVertical } from "lucide-react";
+import { motion } from "framer-motion";
 
 const CreateCoursePage = () => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
+  const [categories, setCategories] = useState([]);
+  const [thumbnailPreview, setThumbnailPreview] = useState(null);
+  const fileRef = useRef();
 
   const [formData, setFormData] = useState({
     title: "",
@@ -13,183 +20,240 @@ const CreateCoursePage = () => {
     category: "",
     level: "beginner",
     price: "",
-    thumbnail: "",
   });
+  const [thumbnailFile, setThumbnailFile] = useState(null);
+
+  useEffect(() => {
+    getCategories().then(res => setCategories(res.data || res)).catch(console.error);
+  }, []);
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
+  const handleThumbnailChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      if (file.size > 5 * 1024 * 1024) {
+        toast.error("Image must be smaller than 5MB");
+        return;
+      }
+      setThumbnailFile(file);
+      setThumbnailPreview(URL.createObjectURL(file));
+    }
+  };
+
+  const handleRemoveThumbnail = (e) => {
+    e.stopPropagation();
+    setThumbnailFile(null);
+    setThumbnailPreview(null);
+    if (fileRef.current) fileRef.current.value = "";
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (!thumbnailFile) {
+      toast.error("Please upload a course thumbnail.");
+      return;
+    }
+
     setLoading(true);
+    let toastId = toast.loading("Creating course...");
+
     try {
-      await axios.post("/api/v1/course", {
-        ...formData,
-        price: Number(formData.price),
-      });
-      alert("Course created successfully!");
-      navigate("/dashboard/courses");
+      const fd = new FormData();
+      Object.entries(formData).forEach(([k, v]) => fd.append(k, v));
+      fd.append("thumbnail", thumbnailFile);
+
+      await createCourse(fd);
+
+      toast.success("Course created successfully!", { id: toastId });
+      navigate("/instructor");
     } catch (err) {
-      console.error(err);
-      alert("Failed to create course");
-    } finally {
+      toast.error(err.response?.data?.message || err.message || "Failed to create course.", { id: toastId });
       setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 px-6 py-10">
-      <div className="max-w-4xl mx-auto">
-
-        {/* Header */}
-        <div className="mb-10">
-          <h2 className="text-3xl font-semibold">Create New Course</h2>
-          <p className="text-gray-600 mt-2">
-            Fill in the details below to create your course
-          </p>
+    <motion.div 
+      initial={{ opacity: 0, y: 15 }} 
+      animate={{ opacity: 1, y: 0 }} 
+      transition={{ duration: 0.4 }}
+      className="min-h-screen pt-10 pb-20 px-6 sm:px-8 max-w-5xl mx-auto w-full"
+    >
+      {/* Header */}
+      <div className="mb-8 flex flex-col md:flex-row md:items-end justify-between gap-4">
+        <div>
+          <Link to="/instructor" className="text-sm font-bold text-slate-500 hover:text-blue-600 mb-4 inline-flex items-center gap-1 group transition-colors">
+            <ArrowLeft size={16} strokeWidth={2.5} className="group-hover:-translate-x-1 transition-transform" /> Back to Dashboard
+          </Link>
+          <h1 className="text-3xl font-heading font-black text-slate-900 tracking-tight">Create New Course</h1>
+          <p className="text-slate-500 mt-2 text-[15px] font-medium">Fill in the details below to publish your next piece of masterclass content.</p>
         </div>
+      </div>
 
-        {/* Form Card */}
-        <div className="bg-white border border-gray-200 rounded-2xl shadow-sm p-8">
-          <form onSubmit={handleSubmit} className="space-y-6">
+      {/* Main Content */}
+      <div className="grid lg:grid-cols-12 gap-10 items-start">
+        <div className="lg:col-span-8">
+          <form id="create-course-form" onSubmit={handleSubmit} className="bg-white rounded-3xl border border-slate-200 shadow-sm p-8 sm:p-10 space-y-8 relative overflow-hidden">
+            {/* Soft decorative glow */}
+            <div className="absolute top-0 right-0 w-64 h-64 bg-blue-50/50 rounded-full blur-[80px] pointer-events-none -translate-y-1/2 translate-x-1/2" />
 
-            {/* Title */}
-            <div>
-              <label className="block text-sm font-medium mb-1">
-                Course Title *
-              </label>
-              <input
-                type="text"
-                name="title"
-                maxLength={100}
-                required
-                placeholder="e.g. Full Stack Web Development"
-                value={formData.title}
-                onChange={handleChange}
-                className="w-full rounded-xl border border-gray-300 px-4 py-2.5 text-sm
-                           focus:outline-none focus:ring-2 focus:ring-black/80"
-              />
-            </div>
-
-            {/* Subtitle */}
-            <div>
-              <label className="block text-sm font-medium mb-1">
-                Subtitle
-              </label>
-              <input
-                type="text"
-                name="subtitle"
-                maxLength={200}
-                placeholder="Short description shown on course cards"
-                value={formData.subtitle}
-                onChange={handleChange}
-                className="w-full rounded-xl border border-gray-300 px-4 py-2.5 text-sm
-                           focus:outline-none focus:ring-2 focus:ring-black/80"
-              />
-            </div>
-
-            {/* Description */}
-            <div>
-              <label className="block text-sm font-medium mb-1">
-                Course Description
-              </label>
-              <textarea
-                name="description"
-                rows={5}
-                placeholder="Describe what students will learn in this course"
-                value={formData.description}
-                onChange={handleChange}
-                className="w-full rounded-xl border border-gray-300 px-4 py-2.5 text-sm
-                           focus:outline-none focus:ring-2 focus:ring-black/80"
-              />
-            </div>
-
-            {/* Category + Level */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+            <div className="space-y-6 relative z-10">
+              {/* Title */}
               <div>
-                <label className="block text-sm font-medium mb-1">
-                  Category *
-                </label>
-                <input
-                  type="text"
-                  name="category"
-                  required
-                  placeholder="e.g. Web Development"
-                  value={formData.category}
-                  onChange={handleChange}
-                  className="w-full rounded-xl border border-gray-300 px-4 py-2.5 text-sm
-                             focus:outline-none focus:ring-2 focus:ring-black/80"
+                <label className="text-xs font-bold uppercase tracking-widest text-slate-500 mb-2 block">Course Title <span className="text-red-500">*</span></label>
+                <input type="text" name="title" maxLength={100} required
+                  placeholder="e.g. Master React 19 in 7 Days"
+                  value={formData.title} onChange={handleChange}
+                  className="w-full h-12 px-4 rounded-xl border border-slate-200 font-medium text-slate-900 focus:ring-2 focus:ring-blue-600/20 focus:border-blue-600 outline-none transition-all"
                 />
               </div>
 
+              {/* Subtitle */}
               <div>
-                <label className="block text-sm font-medium mb-1">
-                  Level
-                </label>
-                <select
-                  name="level"
-                  value={formData.level}
-                  onChange={handleChange}
-                  className="w-full rounded-xl border border-gray-300 px-4 py-2.5 text-sm
-                             focus:outline-none focus:ring-2 focus:ring-black/80"
-                >
-                  <option value="beginner">Beginner</option>
-                  <option value="intermediate">Intermediate</option>
-                  <option value="advanced">Advanced</option>
-                </select>
+                <label className="text-xs font-bold uppercase tracking-widest text-slate-500 mb-2 block">Subtitle <span className="text-slate-400 font-medium normal-case ml-1 tracking-normal">(Optional)</span></label>
+                <input type="text" name="subtitle" maxLength={200}
+                  placeholder="A catchy short description for the course cards"
+                  value={formData.subtitle} onChange={handleChange}
+                  className="w-full h-12 px-4 rounded-xl border border-slate-200 text-slate-700 focus:ring-2 focus:ring-blue-600/20 focus:border-blue-600 outline-none transition-all"
+                />
               </div>
-            </div>
 
-            {/* Price */}
-            <div>
-              <label className="block text-sm font-medium mb-1">
-                Price (₹) *
-              </label>
-              <input
-                type="number"
-                name="price"
-                min={0}
-                required
-                placeholder="e.g. 1999"
-                value={formData.price}
-                onChange={handleChange}
-                className="w-full rounded-xl border border-gray-300 px-4 py-2.5 text-sm
-                           focus:outline-none focus:ring-2 focus:ring-black/80"
-              />
-            </div>
+              {/* Description */}
+              <div>
+                <label className="text-xs font-bold uppercase tracking-widest text-slate-500 mb-2 block">Full Course Description <span className="text-red-500">*</span></label>
+                <textarea name="description" rows={6} required
+                  placeholder="Describe the curriculum, target audience, and what students will learn..."
+                  value={formData.description} onChange={handleChange}
+                  className="w-full px-4 py-3 rounded-xl border border-slate-200 text-slate-700 focus:ring-2 focus:ring-blue-600/20 focus:border-blue-600 outline-none transition-all resize-y"
+                />
+              </div>
 
-            {/* Thumbnail */}
-            <div>
-              <label className="block text-sm font-medium mb-1">
-                Thumbnail URL *
-              </label>
-              <input
-                type="text"
-                name="thumbnail"
-                required
-                placeholder="https://image-url.com/thumbnail.jpg"
-                value={formData.thumbnail}
-                onChange={handleChange}
-                className="w-full rounded-xl border border-gray-300 px-4 py-2.5 text-sm
-                           focus:outline-none focus:ring-2 focus:ring-black/80"
-              />
-            </div>
+              {/* Category & Level Grid */}
+              <div className="grid sm:grid-cols-2 gap-6 pt-2">
+                <div>
+                  <label className="text-xs font-bold uppercase tracking-widest text-slate-500 mb-2 block">Category <span className="text-red-500">*</span></label>
+                  <div className="relative">
+                    <select name="category" required
+                      value={formData.category} onChange={handleChange}
+                      className="w-full h-12 px-4 rounded-xl border border-slate-200 font-medium text-slate-900 bg-white focus:ring-2 focus:ring-blue-600/20 focus:border-blue-600 outline-none appearance-none cursor-pointer"
+                    >
+                      <option value="" disabled>Select a category</option>
+                      {categories.map(cat => (
+                        <option key={cat._id} value={cat._id}>{cat.name}</option>
+                      ))}
+                    </select>
+                    <div className="absolute inset-y-0 right-4 flex items-center pointer-events-none text-slate-400">
+                      <GripVertical size={16} className="text-slate-400" />
+                    </div>
+                  </div>
+                </div>
+                <div>
+                  <label className="text-xs font-bold uppercase tracking-widest text-slate-500 mb-2 block">Difficulty Level <span className="text-red-500">*</span></label>
+                  <div className="relative">
+                    <select name="level" value={formData.level} onChange={handleChange}
+                      className="w-full h-12 px-4 rounded-xl border border-slate-200 font-medium text-slate-900 bg-white focus:ring-2 focus:ring-blue-600/20 focus:border-blue-600 outline-none appearance-none cursor-pointer"
+                    >
+                      <option value="beginner">Beginner Friendly</option>
+                      <option value="intermediate">Intermediate Level</option>
+                      <option value="advanced">Advanced Masters</option>
+                    </select>
+                    <div className="absolute inset-y-0 right-4 flex items-center pointer-events-none text-slate-400">
+                      <GripVertical size={16} className="text-slate-400" />
+                    </div>
+                  </div>
+                </div>
+              </div>
 
-            {/* Submit */}
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full py-3 rounded-xl bg-black text-white font-medium
-                         hover:bg-black/90 transition disabled:opacity-60"
-            >
-              {loading ? "Creating Course..." : "Create Course"}
-            </button>
+            </div>
           </form>
         </div>
 
+        {/* Right Sidebar */}
+        <div className="lg:col-span-4 space-y-6">
+
+          {/* Thumbnail Panel */}
+          <div className="bg-white rounded-3xl border border-slate-200 shadow-sm p-6">
+            <h3 className="text-sm font-bold uppercase tracking-widest text-slate-900 mb-4 block">Course Thumbnail <span className="text-red-500">*</span></h3>
+
+            <div
+              onClick={() => !thumbnailPreview && fileRef.current?.click()}
+              className={`
+                relative border-2 border-dashed rounded-2xl overflow-hidden transition-all duration-200
+                ${thumbnailPreview
+                  ? "border-transparent bg-slate-100"
+                  : "border-slate-300 bg-slate-50 hover:border-blue-500 hover:bg-blue-50/50 cursor-pointer"
+                }
+              `}
+            >
+              {thumbnailPreview ? (
+                <div className="group relative aspect-video w-full">
+                  <img src={thumbnailPreview} alt="preview" className="w-full h-full object-cover" />
+                  <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center backdrop-blur-sm">
+                    <button
+                      type="button"
+                      onClick={handleRemoveThumbnail}
+                      className="h-10 px-4 flex items-center gap-2 bg-white/10 hover:bg-red-500 text-white backdrop-blur-md rounded-full font-semibold text-sm transition-colors"
+                    >
+                      <X size={16} /> Remove Image
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="aspect-video w-full flex flex-col items-center justify-center p-6 text-center">
+                  <div className="w-12 h-12 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center mb-3">
+                    <ImagePlus size={20} strokeWidth={2.5} />
+                  </div>
+                  <p className="text-sm font-bold text-slate-700">Click to upload thumbnail</p>
+                  <p className="text-xs font-semibold text-slate-400 mt-1 uppercase tracking-widest">16:9 ratio, Max 5MB</p>
+                </div>
+              )}
+            </div>
+            <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleThumbnailChange} />
+          </div>
+
+          {/* Pricing Panel */}
+          <div className="bg-gradient-to-br from-white to-blue-50/50 rounded-3xl border border-blue-100 shadow-xl shadow-blue-500/5 p-6 space-y-4">
+            <h3 className="text-sm font-bold uppercase tracking-widest text-slate-900 block">Pricing Strategy</h3>
+
+            <div className="relative">
+              <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-slate-400">
+                <IndianRupee size={18} strokeWidth={2.5} />
+              </div>
+              <input type="number" name="price" min={0} step="any" required form="create-course-form"
+                placeholder="0.00" value={formData.price} onChange={handleChange}
+                className="w-full h-12 pl-11 pr-4 rounded-xl border border-slate-200 text-lg font-bold text-slate-900 focus:ring-2 focus:ring-blue-600/20 focus:border-blue-600 outline-none transition-all bg-white"
+              />
+            </div>
+            <p className="text-[13px] font-medium text-slate-500 flex items-start gap-2 leading-relaxed">
+              <Info size={16} className="text-blue-500 shrink-0 mt-0.5" strokeWidth={2.5} />
+              Set the price to 0 to offer this course entirely for free and grow your audience.
+            </p>
+          </div>
+
+          {/* Submit Action */}
+          <button
+            type="submit"
+            form="create-course-form"
+            disabled={loading}
+            className="btn-primary w-full h-14 text-base shadow-lg shadow-blue-500/25 relative active:scale-[0.98] transition-transform rounded-xl"
+          >
+            {loading ? (
+              <div className="flex items-center justify-center gap-2">
+                <Loader2 size={18} className="animate-spin text-white/80" />
+                Creating Course...
+              </div>
+            ) : "Publish Course Outline"}
+          </button>
+          <p className="text-[11px] font-bold uppercase tracking-widest text-center text-slate-400 mt-4">
+            You can add lectures after publishing the outline.
+          </p>
+
+        </div>
       </div>
-    </div>
+    </motion.div>
   );
 };
 

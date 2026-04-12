@@ -13,7 +13,6 @@ router.route("/upload-video").post(upload.single("file"), async(req,res) => {
             data:result
         });
     } catch (error) {
-        console.log(error);
         res.status(500).json({message:"Error uploading file"})
     }
 });

@@ -1,6 +1,7 @@
 import mongoose from "mongoose";
+import logger from "../utils/logger.js";
 
-const MAX_RETRIES = 3; //Maximum number of times to retry connecting if MongoDB fails.
+const MAX_RETRIES = 10; //Maximum number of times to retry connecting if MongoDB fails.
 const RETRY_INTERVAL = 5000; // Wait time (5 seconds) between retry attempt
 
 // This class encapsulates all database connection logic.
@@ -22,19 +23,19 @@ class DatabaseConnection {
     // mongoose connection events listeners
     // Fires when MongoDB connects successfully
     mongoose.connection.on("connected", () => {
-      console.log("✅ MongoDB connected successfully");
+      logger.info("✅ MongoDB connected successfully");
       this.isConnected = true;
     });
 
     // Fires if MongoDB encounters an error
     mongoose.connection.on("error", (err) => {
-      console.error("❌ MongoDB connection error:", err);
+      logger.error({ err: err.message }, "❌ MongoDB connection error");
       this.isConnected = false;
     });
 
     // Fires when MongoDB disconnects (network issue, server down, etc.)
     mongoose.connection.on("disconnected", () => {
-      console.log("⚠️ MongoDB disconnected");
+      logger.warn("⚠️ MongoDB disconnected");
       this.isConnected = false;
       this.handleDisconnection();
     });
@@ -53,25 +54,22 @@ class DatabaseConnection {
         throw new Error("MongoDB URI is not defined in environment variables");
       }
 
-      const connectionOptions = { // this two needed for olderversion of mongoose below 5or6
-        // useNewUrlParser: true, // Uses modern MongoDB connection string parser
-        // useUnifiedTopology: true, // Uses new MongoDB engine
-        maxPoolSize: 10, // Maximum simultaneous DB connections
-        serverSelectionTimeoutMS: 5000, // Timeout if DB server not found
-        socketTimeoutMS: 45000, // Close inactive connections
-        family: 4, // Use IPv4 Forces IPv4 (avoids IPv6 issues)
+      const connectionOptions = {
+        maxPoolSize: 10,
+        serverSelectionTimeoutMS: 5000,
+        socketTimeoutMS: 45000,
+        family: 4,
       };
 
       // Logs MongoDB queries in development. Helps debugging
       if (process.env.NODE_ENV === "development") {
         mongoose.set("debug", true);
       }
-
-      // Connects to MongoDB // Resets retry counter after success
+      
       await mongoose.connect(process.env.MONGO_URI, connectionOptions);
       this.retryCount = 0; // Reset retry count on successful connection
     } catch (error) {
-      console.error("Failed to connect to MongoDB:", error.message);
+      logger.error({ err: error.message }, "Failed to connect to MongoDB");
       // If connection fails → retry logic kicks in
       await this.handleConnectionError();
     }
@@ -81,15 +79,17 @@ class DatabaseConnection {
     // Checks if retries are still allowed
     if (this.retryCount < MAX_RETRIES) {
       this.retryCount++;
-      console.log(
-        `Retrying connection... Attempt ${this.retryCount} of ${MAX_RETRIES}`
+      logger.info(
+        { attempt: this.retryCount, max: MAX_RETRIES },
+        "Retrying MongoDB connection...",
       );
       // wait for 5 seconds
       await new Promise((resolve) => setTimeout(resolve, RETRY_INTERVAL));
       return this.connect();
     } else {
-      console.error(
-        `Failed to connect to MongoDB after ${MAX_RETRIES} attempts`
+      logger.fatal(
+        { maxRetries: MAX_RETRIES },
+        "Failed to connect to MongoDB after max attempts",
       );
       process.exit(1);
     }
@@ -103,14 +103,14 @@ class DatabaseConnection {
     }
   }
 
-// Closes MongoDB connection cleanly // Prevents memory leaks or hanging connections
+  // Closes MongoDB connection cleanly // Prevents memory leaks or hanging connections
   async handleAppTermination() {
     try {
       await mongoose.connection.close();
-      console.log("MongoDB connection closed through app termination");
+      logger.info("MongoDB connection closed through app termination");
       process.exit(0); // 0 when we like to exit
     } catch (err) {
-      console.error("Error during database disconnection:", err);
+      logger.error({ err: err.message }, "Error during database disconnection");
       process.exit(1); // 1 when it exit due to some error
     }
   }
@@ -126,7 +126,7 @@ class DatabaseConnection {
   }
 }
 
-// Create a single instance // Only one database connection for the entire app 
+// Create a single instance // Only one database connection for the entire app
 // Prevents multiple MongoDB connections
 const dbConnection = new DatabaseConnection();
 // Export the connect function and the instance

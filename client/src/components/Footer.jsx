@@ -1,105 +1,122 @@
 import React from "react";
 import { Link } from "react-router-dom";
-import ROUTES from "../../routes";
-const Footer = () => {
-  return (
-    <footer className="w-full border-t border-gray-200 bg-white mt-20">
-      {/* Top Section */}
-      <div className="max-w-7xl mx-auto px-6 py-10 grid grid-cols-1 md:grid-cols-4 gap-8">
-        {/* Brand */}
-        <div>
-          <h2 className="text-xl font-semibold">BrainOS</h2>
-          <p className="mt-3 text-sm text-gray-600 max-w-xs">
-            Your personal operating system to organize tasks, goals, knowledge,
-            and life — all in one place.
-          </p>
-        </div>
+import { Zap, Twitter, Github, Linkedin, ArrowRight } from "lucide-react";
+import ROUTES from "../routes.jsx";
 
-        {/* Product */}
-        <div>
-          <h3 className="text-sm font-semibold uppercase tracking-wide text-gray-900">
-            Product
-          </h3>
-          <ul className="mt-4 space-y-2 text-sm text-gray-600">
-            <li>
-              <Link to={ROUTES.HOME} className="hover:text-black">
-                Home
-              </Link>
-            </li>
-            <li>
-              <Link to={ROUTES.COURSES_PUBLISHED} className="hover:text-black">
-                Courses
-              </Link>
-            </li>
-            <li>
-              <Link to={ROUTES.DASHBOARD} className="hover:text-black">
-                Dashboard
-              </Link>
-            </li>
-          </ul>
-        </div>
+const FOOTER_LINKS = {
+  Platform: [
+    { label: "Browse Courses", to: ROUTES.COURSES_PUBLISHED },
+    { label: "Instructors", to: "/" }, // Should ideally point to instructor signup/info
+    { label: "Pricing", to: ROUTES.COURSES_PUBLISHED },
+  ],
+  Learn: [
+    { label: "Dashboard", to: ROUTES.DASHBOARD },
+    { label: "My Library", to: ROUTES.MY_COURSES },
+    { label: "Certificates", to: ROUTES.DASHBOARD },
+  ],
+  Company: [
+    { label: "About Us", to: "/" },
+    { label: "Blog", to: "/" },
+    { label: "Careers", to: "/" },
+  ],
+};
 
-        {/* Account */}
-        <div>
-          <h3 className="text-sm font-semibold uppercase tracking-wide text-gray-900">
-            Account
-          </h3>
-          <ul className="mt-4 space-y-2 text-sm text-gray-600">
-            <li>
-              <Link to={ROUTES.SIGNIN} className="hover:text-black">
-                Sign In
-              </Link>
-            </li>
-            <li>
-              <Link to={ROUTES.SIGNUP} className="hover:text-black">
-                Sign Up
-              </Link>
-            </li>
-          </ul>
-        </div>
+const Footer = () => (
+  <footer className="bg-slate-900 text-slate-400">
+    <div className="max-w-7xl mx-auto px-6 lg:px-8 pt-16 pb-8">
 
-        {/* Legal */}
-        <div>
-          <h3 className="text-sm font-semibold uppercase tracking-wide text-gray-900">
-            Legal
-          </h3>
-          <ul className="mt-4 space-y-2 text-sm text-gray-600">
-            <li>
-              <Link to="/privacy" className="hover:text-black">
-                Privacy Policy
-              </Link>
-            </li>
-            <li>
-              <Link to="/terms" className="hover:text-black">
-                Terms of Service
-              </Link>
-            </li>
-          </ul>
-        </div>
-      </div>
+      {/* ── Top Section ── */}
+      <div className="grid lg:grid-cols-5 gap-10 mb-12">
 
-      {/* Bottom Section */}
-      <div className="border-t border-gray-200">
-        <div className="max-w-7xl mx-auto px-6 py-4 flex flex-col md:flex-row items-center justify-between gap-3">
-          <p className="text-sm text-gray-500">
-            © {new Date().getFullYear()} BrainOS. All rights reserved.
+        {/* Brand Column */}
+        <div className="lg:col-span-2 space-y-4">
+          <Link to="/" className="flex items-center gap-2.5 group w-fit">
+            <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center group-hover:scale-105 transition-transform">
+              <Zap size={15} className="text-white" strokeWidth={2.5} />
+            </div>
+            <span className="text-white font-bold font-heading text-lg">LearnHub</span>
+          </Link>
+          <p className="text-sm leading-relaxed max-w-xs text-slate-500">
+            The platform where serious engineers level up. Expert-led courses focused on depth, real architecture, and production-grade skills.
           </p>
 
-          <div className="flex items-center gap-4 text-gray-500">
-            <a href="#" className="hover:text-black">
-              Twitter
-            </a>
-            <a href="#" className="hover:text-black">
-              GitHub
-            </a>
-            <a href="#" className="hover:text-black">
-              LinkedIn
-            </a>
+          {/* Social Links */}
+          <div className="flex items-center gap-3 pt-1">
+            {[
+              { icon: Twitter, href: "#", label: "Twitter" },
+              { icon: Github, href: "#", label: "GitHub" },
+              { icon: Linkedin, href: "#", label: "LinkedIn" },
+            ].map(({ icon: Icon, href, label }) => (
+              <a
+                key={label}
+                href={href}
+                aria-label={label}
+                className="w-9 h-9 rounded-xl bg-slate-800 hover:bg-blue-600 flex items-center justify-center transition-colors"
+              >
+                <Icon size={15} className="text-slate-400 hover:text-white transition-colors" />
+              </a>
+            ))}
           </div>
         </div>
+
+        {/* Link Columns */}
+        {Object.entries(FOOTER_LINKS).map(([heading, links]) => (
+          <div key={heading}>
+            <h4 className="text-sm font-bold font-heading text-white uppercase tracking-widest mb-4" style={{ letterSpacing: "0.06em" }}>
+              {heading}
+            </h4>
+            <ul className="space-y-2.5">
+              {links.map(({ label, to }) => (
+                <li key={label}>
+                  <Link
+                    to={to}
+                    className="text-sm text-slate-500 hover:text-slate-200 transition-colors"
+                  >
+                    {label}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ))}
       </div>
-    </footer>
-  );
-};
+
+      {/* ── Newsletter Row ── */}
+      <div className="rounded-2xl bg-slate-800/60 border border-slate-700/60 p-6 mb-10 flex flex-col sm:flex-row items-center justify-between gap-5">
+        <div>
+          <p className="text-white font-bold font-heading">Stay in the loop</p>
+          <p className="text-sm text-slate-500 mt-0.5">Get new courses and updates delivered to your inbox.</p>
+        </div>
+        <form className="flex gap-2 w-full sm:w-auto" onSubmit={e => e.preventDefault()}>
+          <input
+            type="email"
+            placeholder="your@email.com"
+            className="px-4 py-2.5 bg-slate-900 border border-slate-700 rounded-xl text-sm text-white placeholder-slate-600 focus:outline-none focus:border-blue-500 flex-1 sm:w-60"
+          />
+          <button
+            type="submit"
+            className="px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-semibold font-heading transition-colors flex items-center gap-1.5 shrink-0"
+          >
+            Subscribe <ArrowRight size={14} />
+          </button>
+        </form>
+      </div>
+
+      {/* ── Bottom Bar ── */}
+      <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-6 border-t border-slate-800">
+        <p className="text-xs text-slate-600">
+          © {new Date().getFullYear()} LearnHub. All rights reserved.
+        </p>
+        <div className="flex items-center gap-5">
+          {["Privacy Policy", "Terms of Service", "Cookies"].map((item) => (
+            <Link key={item} to="/" className="text-xs text-slate-600 hover:text-slate-400 transition-colors">
+              {item}
+            </Link>
+          ))}
+        </div>
+      </div>
+    </div>
+  </footer>
+);
 
 export default Footer;

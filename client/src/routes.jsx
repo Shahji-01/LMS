@@ -19,7 +19,11 @@ const ROUTES = {
   MY_PROFILE: "/dashboard/profile",
   CHANGE_PASSWORD: "/dashboard/profile/change-password",
   MY_COURSES: "/dashboard/my-courses",
+  WISHLIST: "/dashboard/wishlist",
   COURSE_PROGRESS: (courseId) => `/dashboard/my-courses/${courseId}/progress`,
+  LECTURE: (courseId, lectureId) => `/course-progress/${courseId}/lecture/${lectureId}`,
+  CERTIFICATE: (courseId) => `/certificate/${courseId}`,
+  QUIZ: (courseId, quizId) => `/course-progress/${courseId}/quiz/${quizId}`,
 
   // Instructor Routes
   CREATE_COURSE: "/instructor/create-course",
@@ -28,8 +32,8 @@ const ROUTES = {
   MANAGE_LECTURES: (courseId) => `/instructor/course/${courseId}/lectures`,
 
   // Purchase / Payment
-  CHECKOUT: (courseId) => `/courses/${courseId}/checkout`,
-  PURCHASES: "/my-purchases",
+  CHECKOUT: (courseId) => `/checkout/${courseId}`,
+  PURCHASES: "/dashboard/my-purchases",
   COURSE_STATUS: (courseId) => `/my-purchases/${courseId}`,
 
   // Fallback

@@ -1,3 +1,5 @@
+import logger from "../utils/logger.js";
+import { AppError } from "../utils/appError.js";
 
 // Error handler for async functions
 export const catchAsync = (fn) => {
@@ -17,7 +19,9 @@ export const errorHandler = (err, req, res, next) => {
             status: err.status,
             error: err,
             message: err.message,
-            stack: err.stack
+            stack: err.stack,
+            ...(err.data && { data: err.data }),
+            ...(err.errors && err.errors.length > 0 && { errors: err.errors })
         });
     } else {
         // Production error response
@@ -25,11 +29,13 @@ export const errorHandler = (err, req, res, next) => {
             // Operational, trusted error: send message to client
             res.status(err.statusCode).json({
                 status: err.status,
-                message: err.message
+                message: err.message,
+                ...(err.data && { data: err.data }),
+                ...(err.errors && err.errors.length > 0 && { errors: err.errors })
             });
         } else {
             // Programming or other unknown error: don't leak error details
-            console.error('ERROR 💥', err);
+            logger.error({ err }, 'ERROR 💥');
             res.status(500).json({
                 status: 'error',
                 message: 'Something went wrong!'
@@ -41,22 +47,22 @@ export const errorHandler = (err, req, res, next) => {
 // Handle specific MongoDB errors
 export const handleMongoError = (err) => {
     if (err.name === 'CastError') {
-        return new AppError(`Invalid ${err.path}: ${err.value}`, 400);
+        return new AppError(400, `Invalid ${err.path}: ${err.value}`);
     }
     if (err.code === 11000) {
         const value = err.errmsg.match(/(["'])(\\?.)*?\1/)[0];
-        return new AppError(`Duplicate field value: ${value}. Please use another value!`, 400);
+        return new AppError(400, `Duplicate field value: ${value}. Please use another value!`);
     }
     if (err.name === 'ValidationError') {
         const errors = Object.values(err.errors).map(el => el.message);
-        return new AppError(`Invalid input data. ${errors.join('. ')}`, 400);
+        return new AppError(400, `Invalid input data. ${errors.join('. ')}`);
     }
     return err;
 };
 
 // Handle JWT errors
-export const handleJWTError = () => 
-    new AppError('Invalid token. Please log in again!', 401);
+export const handleJWTError = () =>
+    new AppError(401, 'Invalid token. Please log in again!');
 
-export const handleJWTExpiredError = () => 
-    new AppError('Your token has expired! Please log in again.', 401);
+export const handleJWTExpiredError = () =>
+    new AppError(401, 'Your token has expired! Please log in again.');

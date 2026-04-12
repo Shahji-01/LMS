@@ -1,197 +1,164 @@
-import Stripe from "stripe";
 import { Course } from "../models/course.model.js";
 import { CoursePurchase } from "../models/coursePurchase.model.js";
-import { Lecture } from "../models/lecture.model.js";
-import { User } from "../models/user.model.js";
 import { catchAsync } from "../middleware/error.middleware.js";
-import { AppError } from "../middleware/error.middleware.js";
-
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+import { AppError } from "../utils/appError.js";
+import { createStripeSession, verifyStripeWebhook } from "../services/payment.service.js";
+import { enrollStudentInCourse } from "../services/enrollment.service.js";
+import { recordRevenue } from "../services/analytics.service.js";
+import logger from "../utils/logger.js";
+import { v4 as uuidv4 } from "uuid";
 
 /**
  * Create a Stripe checkout session for course purchase
- * @route POST /api/v1/payments/create-checkout-session
+ * @route POST /api/v1/purchase/checkout/stripe
  */
 export const initiateStripeCheckout = catchAsync(async (req, res) => {
   const { courseId } = req.body;
+  const userId = req.id;
 
-  // Find course and validate
   const course = await Course.findById(courseId);
   if (!course) {
-    throw new AppError("Course not found", 404);
+    throw new AppError(404, "Course not found.");
   }
 
-  // Create a new course purchase record
-  const newPurchase = new CoursePurchase({
+  // Prevent duplicate purchases
+  const alreadyPurchased = await CoursePurchase.exists({
+    user: userId,
     course: courseId,
-    user: req.id,
-    amount: course.price,
-    status: "pending",
-    paymentMethod: "stripe",
+    status: "completed",
   });
+  if (alreadyPurchased) {
+    throw new AppError(400, "You have already purchased this course.");
+  }
 
-  // Create Stripe checkout session
-  const session = await stripe.checkout.sessions.create({
-    payment_method_types: ["card"],
-    line_items: [
-      {
-        price_data: {
-          currency: "inr",
-          product_data: {
-            name: course.title,
-            images: [],
-          },
-          unit_amount: course.price * 100, // Amount in paise
-        },
-        quantity: 1,
-      },
-    ],
-    mode: "payment",
-    success_url: `${process.env.CLIENT_URL}/course-progress/${courseId}`,
-    cancel_url: `${process.env.CLIENT_URL}/course-detail/${courseId}`,
-    metadata: {
-      courseId: courseId,
-      userId: req.id,
-    },
-    shipping_address_collection: {
-      allowed_countries: ["IN"],
-    },
-  });
+  // Generate idempotency key to prevent double charges
+  const idempotencyKey = uuidv4();
+
+  // Use payment service (uses config, not process.env)
+  const session = await createStripeSession({ course, userId, idempotencyKey });
 
   if (!session.url) {
-    throw new AppError("Failed to create checkout session", 400);
+    throw new AppError(400, "Failed to create Stripe checkout session.");
   }
 
-  // Save purchase record with session ID
-  newPurchase.paymentId = session.id;
-  await newPurchase.save();
+  await CoursePurchase.create({
+    course: courseId,
+    user: userId,
+    amount: course.price,
+    originalAmount: course.price,
+    status: "pending",
+    paymentMethod: "stripe",
+    paymentId: session.id,
+    idempotencyKey,
+  });
 
-  res.status(200).json({
+  logger.info({ courseId, userId, sessionId: session.id }, "[Stripe] Checkout session created");
+
+  return res.status(200).json({
     success: true,
-    data: {
-      checkoutUrl: session.url,
-    },
+    data: { checkoutUrl: session.url },
   });
 });
 
 /**
- * Handle Stripe webhook events
- * @route POST /api/v1/payments/webhook
+ * Handle Stripe webhook — confirms payment and enrolls student
+ * @route POST /api/v1/purchase/webhook/stripe
  */
 export const handleStripeWebhook = catchAsync(async (req, res) => {
-  let event;
+  const sig = req.headers["stripe-signature"];
 
-  try {
-    const payloadString = JSON.stringify(req.body, null, 2);
-    const secret = process.env.STRIPE_WEBHOOK_SECRET;
+  // FIX: use verifyStripeWebhook from payment.service (uses config.STRIPE_WEBHOOK_SECRET)
+  const event = verifyStripeWebhook(req.body, sig);
 
-    const header = stripe.webhooks.generateTestHeaderString({
-      payload: payloadString,
-      secret,
-    });
-
-    event = stripe.webhooks.constructEvent(payloadString, header, secret);
-  } catch (error) {
-    throw new AppError(`Webhook Error: ${error.message}`, 400);
-  }
-
-  // Handle the checkout.session.completed event
   if (event.type === "checkout.session.completed") {
     const session = event.data.object;
 
-    // Find and update purchase record
-    const purchase = await CoursePurchase.findOne({
-      paymentId: session.id,
-    }).populate("course");
+    const purchase = await CoursePurchase.findOne({ paymentId: session.id }).populate("course");
 
     if (!purchase) {
-      throw new AppError("Purchase record not found", 404);
+      logger.warn({ sessionId: session.id }, "[Stripe] Webhook: purchase record not found");
+      // Return 200 to prevent Stripe from retrying indefinitely
+      return res.status(200).json({ received: true });
     }
 
-    // Update purchase details
-    purchase.amount = session.amount_total
-      ? session.amount_total / 100
-      : purchase.amount;
+    // Idempotency guard
+    if (purchase.status === "completed") {
+      logger.warn({ sessionId: session.id }, "[Stripe] Webhook: duplicate event — already completed");
+      return res.status(200).json({ received: true });
+    }
+
+    purchase.amount = session.amount_total ? session.amount_total / 100 : purchase.amount;
     purchase.status = "completed";
     await purchase.save();
 
-    // Make all lectures accessible
-    if (purchase.course?.lectures?.length > 0) {
-      await Lecture.updateMany(
-        { _id: { $in: purchase.course.lectures } },
-        { $set: { isPreviewFree: true } }
-      );
-    }
+    // FIX: Use shared enrollment service (single source of truth)
+    await enrollStudentInCourse({
+      userId: purchase.user,
+      courseId: purchase.course,
+      amount: purchase.amount,
+      paymentMethod: "stripe",
+    });
 
-    // Update user's enrolled courses
-    await User.findByIdAndUpdate(
-      purchase.user._id,
-      { $addToSet: { enrolledCourses: purchase.course._id } },
-      { new: true }
-    );
+    // Record revenue for analytics (background)
+    recordRevenue(purchase.course._id, purchase.course.instructor, purchase.amount).catch(() => {});
 
-    // Update course's enrolled students
-    await Course.findByIdAndUpdate(
-      purchase.course._id,
-      { $addToSet: { enrolledStudents: purchase.user } },
-      { new: true }
-    );
+    logger.info({ purchaseId: purchase._id, userId: purchase.user }, "[Stripe] Webhook: student enrolled");
   }
 
-  res.status(200).json({ received: true });
+  return res.status(200).json({ received: true });
 });
 
 /**
- * Get course details with purchase status
- * @route GET /api/v1/payments/courses/:courseId/purchase-status
+ * Get purchase status for a course
+ * @route GET /api/v1/purchase/status/:courseId
  */
 export const getCoursePurchaseStatus = catchAsync(async (req, res) => {
   const { courseId } = req.params;
 
-  // Find course with populated data
   const course = await Course.findById(courseId)
-    .populate("creator", "name avatar")
-    .populate("lectures", "lectureTitle videoUrl duration");
+    .populate("instructor", "name avatar")
+    .populate("lectures", "title videoUrl duration isPreview");
 
   if (!course) {
-    throw new AppError("Course not found", 404);
+    throw new AppError(404, "Course not found.");
   }
 
-  // Check if user has purchased the course
-  const purchased = await CoursePurchase.exists({
+  const purchase = await CoursePurchase.findOne({
     user: req.id,
     course: courseId,
-    status: "completed",
-  });
+  }).sort({ createdAt: -1 });
 
-  res.status(200).json({
+  return res.status(200).json({
     success: true,
     data: {
       course,
-      isPurchased: Boolean(purchased),
+      isPurchased: purchase?.status === "completed",
+      status: purchase?.status || null,
     },
   });
 });
 
 /**
- * Get all purchased courses
- * @route GET /api/v1/payments/purchased-courses
+ * Get all purchased/enrolled courses for current user
+ * @route GET /api/v1/purchase/my-courses
  */
 export const getPurchasedCourses = catchAsync(async (req, res) => {
   const purchases = await CoursePurchase.find({
-    userId: req.id,
+    user: req.id,
     status: "completed",
   }).populate({
-    path: "courseId",
-    select: "courseTitle courseThumbnail courseDescription category",
+    path: "course",
+    select: "title thumbnail description category level instructor",
     populate: {
-      path: "creator",
+      path: "instructor",
       select: "name avatar",
     },
   });
 
-  res.status(200).json({
+  const courses = purchases.map((p) => p.course).filter(Boolean);
+
+  return res.status(200).json({
     success: true,
-    data: purchases.map((purchase) => purchase.courseId),
+    data: courses,
   });
 });

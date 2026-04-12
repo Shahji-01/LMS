@@ -1,24 +1,18 @@
-import {createLogger, format, transports} from "winston";
-const {combine, timestamp, json, colorize} = format;
+import pino from "pino";
+import config from "../config/env.js";
 
-// Custom format for console logging with colors
-const consoleLogFormat = format.combine(
-  format.colorize(),
-  format.printf(({ level, message, timestamp }) => {
-    return `${level}: ${message}`;
-  })
-);
-
-// Create a Winston logger
-const logger = createLogger({
-  level: "info",
-  format: combine(colorize(), timestamp(), json()),
-  transports: [
-    new transports.Console({
-      format: consoleLogFormat,
-    }),
-    new transports.File({ filename: "app.log" }),
-  ],
+const logger = pino({
+  level: config.NODE_ENV === "production" ? "info" : "debug",
+  ...(config.NODE_ENV !== "production" && {
+    transport: {
+      target: "pino-pretty",
+      options: {
+        colorize: true,
+        translateTime: "SYS:HH:MM:ss",
+        ignore: "pid,hostname",
+      },
+    },
+  }),
 });
 
 export default logger;

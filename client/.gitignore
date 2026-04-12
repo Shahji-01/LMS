@@ -44,3 +44,10 @@ Thumbs.db
 .eslintcache
 .cache/
 .tmp/
+
+# Local analysis artifacts
+lint*.json
+lint*.txt
+build_output.txt
+build.log
+build_crash.log

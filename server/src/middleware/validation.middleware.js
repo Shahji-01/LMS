@@ -1,24 +1,6 @@
 import { body, param, query, validationResult } from "express-validator";
 import { AppError } from "../utils/appError.js";
 
-// this is used when the validators are in the routes as pre function execution before the this middleware
-
-// const validate = (req, res, next) => {
-//   const errors = validationResult(req);
-
-//   if (errors.isEmpty()) {
-//     return next();
-//   }
-//   console.log(errors);
-//   // and now we extract the errors fro the errors;
-
-//   const extractedErrors = errors.array().map((err) => ({
-//     field: err.path,
-//     message: err.msg,
-//   }));
-//   throw new AppError("Validation failed", 400, extractedErrors);
-// };
-
 // this is used when we take the validator in same file not in the routes
 export const validate = (validations) => {
   // this is function that return an middleware
@@ -36,9 +18,10 @@ export const validate = (validations) => {
       extractedErrors.push({
         field: el.path,
         value: el.value,
+        message: el.msg,
       });
     });
-    throw new AppError(400, "Validation failed", extractedErrors);
+    throw new AppError(400, "Validation failed", null, extractedErrors);
   };
 };
 
@@ -74,9 +57,7 @@ export const commonValidations = {
   name: body("name")
     .trim()
     .isLength({ min: 2, max: 50 })
-    .withMessage("Name must be between 2 and 50 characters")
-    .matches(/^[a-zA-Z\s]*$/)
-    .withMessage("Name can only contain letters and spaces"),
+    .withMessage("Name must be between 2 and 50 characters"),
 
   price: body("price")
     .isFloat({ min: 0 })

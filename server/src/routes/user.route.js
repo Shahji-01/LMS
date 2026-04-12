@@ -9,24 +9,31 @@ import {
   resetPassword,
   signOutUser,
   updateUserProfile,
+  verifyEmail,
+  refreshToken,
 } from "../controllers/user.controller.js";
 import { isAuthenticated } from "../middleware/auth.middleware.js";
-import {upload} from "../utils/multer.js";
+import { upload } from "../utils/multer.js";
 import {
   validateSignup,
   validateSignin,
   validatePasswordChange,
 } from "../middleware/validation.middleware.js";
+import { authLimiter, resetLimiter } from "../middleware/rateLimit.middleware.js";
 
 const router = express.Router();
 
 // Auth routes
-router.post("/signup", validateSignup, createUserAccount);
-router.post("/signin", validateSignin, authenticateUser);
+router.post("/signup", authLimiter, validateSignup, createUserAccount);
+router.post("/signin", authLimiter, validateSignin, authenticateUser);
 router.post("/signout", signOutUser);
+router.post("/refresh-token", refreshToken);
 
-// this is here for testing only purpose
-router.post("/forgot-password", forgotPassword);
+// Email verification
+router.post("/verify-email", verifyEmail);
+
+// Password reset
+router.post("/forgot-password", resetLimiter, forgotPassword);
 router.post("/reset-password/:token", resetPassword);
 
 // Profile routes

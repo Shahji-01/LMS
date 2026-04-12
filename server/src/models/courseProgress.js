@@ -52,6 +52,9 @@ const courseProgressSchema = new mongoose.Schema({
     toObject: { virtuals: true }
 });
 
+// Compound unique index — critical for performance (findOne({user,course}) on every progress update)
+courseProgressSchema.index({ user: 1, course: 1 }, { unique: true });
+
 // Calculate completion percentage before saving
 courseProgressSchema.pre('save', async function(next) {
     if (this.lectureProgress.length > 0) {
@@ -68,4 +71,4 @@ courseProgressSchema.methods.updateLastAccessed = function() {
     return this.save({ validateBeforeSave: false });
 };
 
-export const CourseProgress = mongoose.model('CourseProgress', courseProgressSchema);
+export const CourseProgress = mongoose.model('CourseProgress', courseProgressSchema);
